@@ -4,3 +4,12 @@ wx:
   work:
     token: OvBIwwsQRvNsk7LUL0CJS2n7
     encodingAESKey: a8QRrWEiEhcW1YyNWAg9M8EyqjEYiFEweUjl9CQuRHJ
+llm:
+#  type: dify
+#  base-url: https://api.dify.ai/v1
+#  chatflow-api-key:
+#  workflow-api-key: your-api-key
+  type: bailian
+  base-url: https://dashscope.aliyuncs.com/api/v1
+  api-key: sk-73bdcfff163644a6b05d21c83229e911
+  app-id: 1ac69ece1acb47e88141949cc64b9a76

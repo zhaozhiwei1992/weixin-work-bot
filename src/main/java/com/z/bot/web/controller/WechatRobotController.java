@@ -2,16 +2,14 @@ package com.z.bot.web.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.qq.weixin.mp.aes.WXBizJsonMsgCrypt;
-import com.z.bot.service.ReplyMessage;
+import com.z.bot.repository.StreamMapRepository;
+import com.z.bot.service.ReplyMessageStream;
 import com.z.bot.web.vo.RobotData;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Date;
 
 /**
  * @Title: WechatRobotController
@@ -37,8 +35,10 @@ public class WechatRobotController {
     private String sEncodingAESKey;
 
     @Autowired
-    @Qualifier("replyMessageStream")
-    private ReplyMessage replyMessage;
+    private ReplyMessageStream replyMessageStream;
+
+    @Autowired
+    private StreamMapRepository streamMapRepository;
 
     @GetMapping("/")
     public String echo(){
@@ -92,6 +92,8 @@ public class WechatRobotController {
      *         "content": "@RobotA hello robot"
      *     }
      * }
+     *
+      curl -X POST http://127.0.0.1:8080/wx/work/robot/push/wechat?msg_signature=65173e4c8284b36c27ea1565a12fe9b98da7b760&timestamp=1698044465&nonce=1698044465 -H "Content-Type: application/json" -d '{"encrypt":"1/eL5o4f0xYunv/GG/9AVW+UXnj3ZCntsFmkLcTW8Ekm8nenhQ2IcTzeZNQujFiXgjrEMAnxFX55pHnYZHxmlEl6K9k+gjLiS8k2gKn4hqmATH8WcQgJW+pahiqg3jH4WMuk6RSgZ6QpL4x21LgUB3SimB5DM4SkkrIDt+sWgM2L0JjJqK9vFio0txS12CW5GBjlpVhg1kcvJP9JZ9c/VYU0eJ9R8I3GfI377UlINYHgwwfFTyRIpeWz8gS9lybijk7vFcNrW+qyvRKOKZeT3Mi7OXuLu4MKuVLL8fDy45E="}'
      */
     @PostMapping("/push/wechat")
     public String wechatPost(
@@ -125,12 +127,29 @@ public class WechatRobotController {
                 log.info("用户[{}]在[{}]聊天中发送消息: {}", userId, chatType, content);
 
                 // 构建回复消息
-                String replyMsg = replyMessage.reply(json);
+                String replyMsg = replyMessageStream.reply(json);
                 log.info("加密前的回复消息: {}", replyMsg);
                 // 加密回复消息
                 String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
                 log.info("加密后的回复消息: {}", encryptMsg);
                 return encryptMsg;
+            }else if("stream".equals(msgType)){
+                // 企业微信官方文档显示如果首次返回stream，则后续的stream消息会返回stream_id，且stream_id不变
+//                消息解密后内容: {"msgid":"41413b725769f5dd1511b50c1a3f0372","aibotid":"aibwoClDfhayTHybweKcelEOjHOWvgWiylE","chattype":"single","from":{"userid":"ZhaoZhiWei"},"msgtype":"stream","stream":{"id":"STREAM123"}}
+                JSONObject streamObj = json.getJSONObject("stream");
+                String streamId= streamObj.getString("id");
+                // 通过streamId获取数据栈，返回结果
+                String poll = streamMapRepository.poll(streamId);
+                String replyMsg;
+                if("messageend".equals(poll)){
+                    replyMsg = replyMessageStream.buildStreamMessage("", streamId, true, null);
+                }else{
+                    replyMsg = replyMessageStream.buildStreamMessage(poll, streamId, false, null);
+                }
+                log.info("加密前的回复消息: {}", replyMsg);
+                // 加密回复消息
+                String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
+                log.info("加密后的回复消息: {}", encryptMsg);
             }
 
         } catch (Exception e) {
