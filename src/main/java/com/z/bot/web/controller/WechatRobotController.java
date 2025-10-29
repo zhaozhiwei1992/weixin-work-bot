@@ -2,9 +2,13 @@ package com.z.bot.web.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.qq.weixin.mp.aes.WXBizJsonMsgCrypt;
+import com.z.bot.service.ReplyMessage;
 import com.z.bot.web.vo.RobotData;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
@@ -26,10 +30,15 @@ import java.util.Date;
 public class WechatRobotController {
     
     // 配置参数 - 需替换为实际值
-    static final String sToken = "OvBIwwsQRvNsk7LUL0CJS2n7";
-    // 您的企业ID，此处空着，官网有说明，内部用空着即可
-    static final String sCorpID = "";
-    static final String sEncodingAESKey = "a8QRrWEiEhcW1YyNWAg9M8EyqjEYiFEweUjl9CQuRHJ";
+    @Value("${wx.work.token}")
+    private String sToken;
+
+    @Value("${wx.work.encodingAESKey}")
+    private String sEncodingAESKey;
+
+    @Autowired
+    @Qualifier("replyMessageStream")
+    private ReplyMessage replyMessage;
 
     @GetMapping("/")
     public String echo(){
@@ -44,7 +53,7 @@ public class WechatRobotController {
     public String wechatGet(
             @RequestParam("msg_signature") String msgSignature,
             @RequestParam("timestamp") String timestamp,
-            @RequestParam("corpid") String corpid, // 从URL参数获取corpid
+            @RequestParam("corpid") String corpid, // 企业id
             @RequestParam("nonce") String nonce,
             @RequestParam("echostr") String echostr) {
         
@@ -53,7 +62,7 @@ public class WechatRobotController {
         
         try {
             // 使用URL中的corpid初始化加解密工具
-            WXBizJsonMsgCrypt wxcpt = new WXBizJsonMsgCrypt(sToken, sEncodingAESKey, corpid);
+            WXBizJsonMsgCrypt wxcpt = new WXBizJsonMsgCrypt(sToken, sEncodingAESKey, "");
             
             // 验证URL并获取明文echostr
             String sEchoStr = wxcpt.VerifyURL(msgSignature, timestamp, nonce, echostr);
@@ -95,8 +104,8 @@ public class WechatRobotController {
         log.info("接收到的加密消息: {}", JSON.toJSONString(postData));
 
         try {
-            // 使用固定的企业ID初始化加解密工具
-            WXBizJsonMsgCrypt wxcpt = new WXBizJsonMsgCrypt(sToken, sEncodingAESKey, sCorpID);
+            // 加解密库要求传 receiveid 参数，企业自建智能机器人的使用场景里，receiveid直接传空字符串即可；。
+            WXBizJsonMsgCrypt wxcpt = new WXBizJsonMsgCrypt(sToken, sEncodingAESKey, "");
 
             // 解密消息
             String sMsg = wxcpt.DecryptMsg(msgSignature, timestamp, nonce, JSON.toJSONString(postData));
@@ -116,7 +125,7 @@ public class WechatRobotController {
                 log.info("用户[{}]在[{}]聊天中发送消息: {}", userId, chatType, content);
 
                 // 构建回复消息
-                String replyMsg = buildReplyMessage(json, content);
+                String replyMsg = replyMessage.reply(json);
                 log.info("加密前的回复消息: {}", replyMsg);
                 // 加密回复消息
                 String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
@@ -129,41 +138,6 @@ public class WechatRobotController {
         }
 
         return "success";
-    }
-
-    /**
-     * 构建回复消息
-     */
-    private String buildReplyMessage(JSONObject originalMsg, String content) {
-        String userId = originalMsg.getJSONObject("from").getString("userid");
-        String chatType = originalMsg.getString("chattype");
-
-        JSONObject reply = new JSONObject();
-
-        // 根据聊天类型设置接收方
-        if ("group".equals(chatType)) {
-            String chatId = originalMsg.getString("chatid");
-            reply.put("chatid", chatId);
-        } else {
-            reply.put("touser", userId);
-        }
-
-        // 设置消息类型和内容
-        JSONObject textContent = new JSONObject();
-
-        // 简单回复逻辑示例
-        if (content.contains("你好")) {
-            textContent.put("content", "你好呀！我是智能机器人，有什么可以帮您的吗？");
-        } else if (content.contains("时间")) {
-            textContent.put("content", "当前时间是: " + new Date());
-        } else {
-            textContent.put("content", "抱歉，我还不能理解这个问题。请尝试问我其他问题！");
-        }
-
-        reply.put("msgtype", "text");
-        reply.put("text", textContent);
-
-        return reply.toString();
     }
 
 }

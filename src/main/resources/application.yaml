@@ -1,2 +1,6 @@
 server:
   port: 8080
+wx:
+  work:
+    token: OvBIwwsQRvNsk7LUL0CJS2n7
+    encodingAESKey: a8QRrWEiEhcW1YyNWAg9M8EyqjEYiFEweUjl9CQuRHJ
