@@ -2,8 +2,8 @@ server:
   port: 8080
 wx:
   work:
-    token: OvBIwwsQRvNsk7LUL0CJS2n7
-    encodingAESKey: a8QRrWEiEhcW1YyNWAg9M8EyqjEYiFEweUjl9CQuRHJ
+    token: OvBIwwsQRvNsk7LUL0CJS2n7 # 替换为你自己的
+    encodingAESKey: a8QRrWEiEhcW1YyNWAg9M8EyqjEYiFEweUjl9CQuRHJ # 替换为你自己的
 llm:
 #  type: dify
 #  base-url: https://api.dify.ai/v1
@@ -11,5 +11,5 @@ llm:
 #  workflow-api-key: your-api-key
   type: bailian
   base-url: https://dashscope.aliyuncs.com/api/v1
-  api-key: sk-73bdcfff163644a6b05d21c83229e911
-  app-id: 1ac69ece1acb47e88141949cc64b9a76
+  api-key: sk-73bdcfff163644a6b05d21c83229e911 # 替换为你自己的
+  app-id: 1ac69ece1acb47e88141949cc64b9a76 # 替换为你自己的

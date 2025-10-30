@@ -9,7 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Date;
 
 /**
  * @Title: WechatRobotController
@@ -117,6 +120,7 @@ public class WechatRobotController {
             JSONObject json = new JSONObject(sMsg);
             String msgType = json.getString("msgtype");
             String chatType = json.getString("chattype"); // 聊天类型: single/group
+            log.info("消息类型: {}, 聊天类型: {}", msgType, chatType);
 
             // 处理文本消息
             if ("text".equals(msgType)) {
@@ -128,6 +132,7 @@ public class WechatRobotController {
 
                 // 构建回复消息
                 String replyMsg = replyMessageStream.reply(json);
+
                 log.info("加密前的回复消息: {}", replyMsg);
                 // 加密回复消息
                 String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
@@ -140,16 +145,23 @@ public class WechatRobotController {
                 String streamId= streamObj.getString("id");
                 // 通过streamId获取数据栈，返回结果
                 String poll = streamMapRepository.poll(streamId);
+                String streamText = streamMapRepository.getStreamText(streamId);
+                log.info("streamId: {}, pull: {}, streamText: {}", streamId, poll, streamText);
                 String replyMsg;
-                if("messageend".equals(poll)){
-                    replyMsg = replyMessageStream.buildStreamMessage("", streamId, true, null);
+                if(!StringUtils.hasText(streamText)){
+                    replyMsg = replyMessageStream.buildStreamMessage("你好呀！我是智能机器人，有什么可以帮您的吗？ 当前时间是" + new Date(), streamId, true, null);
+                }else if("messageend".equals(poll)){
+                    replyMsg = replyMessageStream.buildStreamMessage(streamText, streamId, true, null);
+                    // 结束后清理数据
+                    streamMapRepository.delete(streamId);
                 }else{
-                    replyMsg = replyMessageStream.buildStreamMessage(poll, streamId, false, null);
+                    replyMsg = replyMessageStream.buildStreamMessage(streamText, streamId, false, null);
                 }
-                log.info("加密前的回复消息: {}", replyMsg);
+                log.info("streamId: {}, 加密前的回复消息: {}", streamId, replyMsg);
                 // 加密回复消息
                 String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
-                log.info("加密后的回复消息: {}", encryptMsg);
+                log.info("streamId: {}, 加密后的回复消息: {}", streamId, encryptMsg);
+                return encryptMsg;
             }
 
         } catch (Exception e) {

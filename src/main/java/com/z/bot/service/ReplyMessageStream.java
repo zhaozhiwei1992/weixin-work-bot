@@ -97,10 +97,10 @@ public class ReplyMessageStream implements ReplyMessage {
         Flux<Map<String, Object>> rMap = eventStream
                 .map(event -> {
                     Map<String, Object> r = new HashMap<>();
-                    log.info("event返回: {}", event);
                     conversationId.set(event.get("conversation_id") + "");
                     if ("message".equals(event.get("event"))) {
                         if (event.get("answer") != null) {
+                            // 保存流式结果
                             streamMapRepository.add(conversationId.get(), event.get("answer") + "");
                         }
                     } else if ("message_end".equals(event.get("event"))) {

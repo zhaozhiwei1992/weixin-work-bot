@@ -13,4 +13,4 @@ else
 echo "weixin-work-bot already shutdown successfully!"
 fi
 
-nohup java -Xms256m  -Xmx256m -Dserver.port=8080 -jar  weixin-work-bot-*-SNAPSHOT.jar &> weixin-work-bot-nohup.out &
+nohup java -Dfile.encoding=UTF-8 -Xms256m  -Xmx256m -Dserver.port=8080 -jar  weixin-work-bot-*-SNAPSHOT.jar &> weixin-work-bot-nohup.out &
