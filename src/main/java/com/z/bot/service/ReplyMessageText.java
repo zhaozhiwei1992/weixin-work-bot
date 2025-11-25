@@ -13,7 +13,7 @@ import java.util.Date;
  //                        "    \"content\": \"hello\\nI'm RobotA\\n\"\n" +
  //                        "  }\n" +
  //                        "}";
- * 这种官方给出的格式步行，可以换个方式直接结束
+ * 这种官方给出的格式不行，可以换个方式直接结束
  */
 @Service
 public class ReplyMessageText implements ReplyMessage{
