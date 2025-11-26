@@ -113,10 +113,11 @@ public class WechatRobotController {
             WXBizJsonMsgCrypt wxcpt = new WXBizJsonMsgCrypt(sToken, sEncodingAESKey, "");
 
             // 解密消息
+            // 测试用解析消息内容
+//            String sMsg = "{\"msgid\":\"38c5aeb9a86dabb79376dbf2c0611988\",\"aibotid\":\"aibwoClDfhayTHybweKcelEOjHOWvgWiylE\",\"chattype\":\"single\",\"from\":{\"userid\":\"ZhaoZhiWei\"},\"msgtype\":\"text\",\"response_url\":\"https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=jPDLj3bUQiiB8nknhT45zwAA_8d2TffJ9qdx4m92MZ5bfyvpp_V66Kd103BRoB8easQo46hgocnU0_sVkln2dQY8g\",\"text\":{\"content\":\"查询215号商品\"}}";
             String sMsg = wxcpt.DecryptMsg(msgSignature, timestamp, nonce, JSON.toJSONString(postData));
-            log.info("消息解密后内容: {}", sMsg);
+            log.info("接收消息解密后内容: {}", sMsg);
 
-            // 解析消息内容
             JSONObject json = new JSONObject(sMsg);
             String msgType = json.getString("msgtype");
             String chatType = json.getString("chattype"); // 聊天类型: single/group
@@ -130,7 +131,7 @@ public class WechatRobotController {
 
                 log.info("用户[{}]在[{}]聊天中发送消息: {}", userId, chatType, content);
 
-                // 构建回复消息
+                // 构建回复消息, 企业微信采用的是轮询请求机制，所以消息需要在这里异步构建好，企业微信轮询访问即可。.可以做简单的生产消费模式放到一个queue里
                 String replyMsg = replyMessageStream.reply(json);
 
                 log.info("加密前的回复消息: {}", replyMsg);
@@ -148,19 +149,17 @@ public class WechatRobotController {
                 String streamText = streamMapRepository.getStreamText(streamId);
                 log.info("streamId: {}, pull: {}, streamText: {}", streamId, poll, streamText);
                 String replyMsg;
-                if(!StringUtils.hasText(streamText)){
-                    replyMsg = replyMessageStream.buildStreamMessage("你好呀！我是智能机器人，有什么可以帮您的吗？ 当前时间是" + new Date(), streamId, true, null);
-                }else if("messageend".equals(poll)){
+                if("messageend".equals(poll)){
                     replyMsg = replyMessageStream.buildStreamMessage(streamText, streamId, true, null);
                     // 结束后清理数据
                     streamMapRepository.delete(streamId);
                 }else{
                     replyMsg = replyMessageStream.buildStreamMessage(streamText, streamId, false, null);
                 }
-                log.info("streamId: {}, 加密前的回复消息: {}", streamId, replyMsg);
+                log.debug("streamId: {}, 加密前的回复消息: {}", streamId, replyMsg);
                 // 加密回复消息
                 String encryptMsg = wxcpt.EncryptMsg(replyMsg, timestamp, nonce);
-                log.info("streamId: {}, 加密后的回复消息: {}", streamId, encryptMsg);
+                log.debug("streamId: {}, 加密后的回复消息: {}", streamId, encryptMsg);
                 return encryptMsg;
             }
 

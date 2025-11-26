@@ -1,6 +1,5 @@
 package com.z.bot.service;
 
-import com.alibaba.fastjson.JSON;
 import com.z.bot.adapter.model.chat.ChatMessage;
 import com.z.bot.platform.AbstractAIService;
 import com.z.bot.repository.StreamMapRepository;
@@ -10,9 +9,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -46,6 +49,16 @@ public class ReplyMessageStream implements ReplyMessage {
     @Autowired
     private AbstractAIService abstractAIService;
 
+    /**
+     * @Title: ReplyMessageStream
+     * @Package com/z/bot/service/ReplyMessageStream.java
+     * @Description: 1. 立即回复，保证企业微信不会一直重复发msgtype=text请求
+     * 2. 异步继续接收流式数据， 保证后续msgtype=stream可以收到消息
+     * 3. 因为第三方ai服务返回的会话id无法保证实时性能，所以最好用自己生成的id
+     * @author zhaozhiwei
+     * @date 2025/11/26 15:43
+     * @version V1.0
+     */
     @Override
     public String reply(JSONObject originalMsg) {
         String userId = originalMsg.getJSONObject("from").getString("userid");
@@ -93,11 +106,14 @@ public class ReplyMessageStream implements ReplyMessage {
             }
         }
 
-        AtomicReference<String> conversationId = new AtomicReference<>("");
+        // 使用streamMapRepository不断收集流式响应数据
+        AtomicReference<String> conversationId = new AtomicReference<>(this.generateLocalConversationId(userId));
         Flux<Map<String, Object>> rMap = eventStream
+                .subscribeOn(Schedulers.boundedElastic())
                 .map(event -> {
                     Map<String, Object> r = new HashMap<>();
-                    conversationId.set(event.get("conversation_id") + "");
+//                    自定义会话id保证企业微信下的响应效果
+//                    conversationId.set(event.get("conversation_id") + "");
                     if ("message".equals(event.get("event"))) {
                         if (event.get("answer") != null) {
                             // 保存流式结果
@@ -108,34 +124,21 @@ public class ReplyMessageStream implements ReplyMessage {
                         streamMapRepository.add(conversationId.get(), "messageend");
                     }
                     if (log.isDebugEnabled()) {
-                        log.debug("event返回: {}", event);
+                        log.debug("自定义会话id: {}, event返回: {}", conversationId.get(), event);
                         log.debug("返回前端结果：{}", r);
                     }
                     return r;
-                });
+                }).doOnError(error -> log.error("在处理AI事件流时发生异常", error));
 
         rMap.subscribe();
 
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        String replyMsg;
-        while (true){
-            // 只获取第一个
-            String poll = streamMapRepository.poll(conversationId.get());
-            if(StringUtils.hasText(poll)){
-                replyMsg = buildStreamMessage(
-                        poll,
-                        conversationId.get(),
-                        false,
-                        null
-                );
-                break;
-            }
-        }
-        return replyMsg;
+        // 立即返回一个请求保证及时相应
+        return buildStreamMessage(
+                "",
+                conversationId.get(),
+                false,
+                null
+        );
     }
 
     public String buildStreamMessage(String content, String streamId, boolean finish,
@@ -167,5 +170,10 @@ public class ReplyMessageStream implements ReplyMessage {
 
         imageMsg.put("image", image);
         return imageMsg;
+    }
+
+    private String generateLocalConversationId(String userId) {
+        String userPrefix = userId.length() > 4 ? userId.substring(0, 4) : userId;
+        return "conv_" + userPrefix + "_" + System.currentTimeMillis() + "_" + new Random().nextInt(1000);
     }
 }
